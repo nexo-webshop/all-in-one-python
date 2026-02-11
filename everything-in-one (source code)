@@ -1,0 +1,271 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, colorchooser, messagebox, font
+from PIL import Image, ImageDraw, ImageTk
+import os
+
+class AllesInEenSoftware:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Alles-in-1 Software")
+        self.root.geometry("1000x700")
+        
+        # Notebook voor tabs
+        self.notebook = ttk.Notebook(root)
+        self.notebook.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # Maak verschillende tabs
+        self.create_paint_tab()
+        self.create_text_editor_tab()
+        self.create_calculator_tab()
+        self.create_notes_tab()
+        
+    def create_paint_tab(self):
+        """Paint/Teken applicatie"""
+        paint_frame = ttk.Frame(self.notebook)
+        self.notebook.add(paint_frame, text="🎨 Paint")
+        
+        # Toolbar
+        toolbar = tk.Frame(paint_frame, bg='lightgray', height=50)
+        toolbar.pack(side='top', fill='x')
+        
+        # Kleur kiezen knop
+        self.paint_color = 'black'
+        self.color_button = tk.Button(toolbar, text="Kleur", command=self.choose_color, 
+                                       bg=self.paint_color, width=8)
+        self.color_button.pack(side='left', padx=5, pady=5)
+        
+        # Pendikte
+        tk.Label(toolbar, text="Pendikte:", bg='lightgray').pack(side='left', padx=5)
+        self.pen_size = tk.Scale(toolbar, from_=1, to=20, orient='horizontal', length=150)
+        self.pen_size.set(3)
+        self.pen_size.pack(side='left', padx=5)
+        
+        # Gereedschap knoppen
+        tk.Button(toolbar, text="Wissen", command=self.clear_canvas).pack(side='left', padx=5)
+        tk.Button(toolbar, text="Opslaan", command=self.save_drawing).pack(side='left', padx=5)
+        
+        # Canvas voor tekenen
+        self.canvas = tk.Canvas(paint_frame, bg='white', cursor='crosshair')
+        self.canvas.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # PIL Image voor opslaan
+        self.image = Image.new('RGB', (1000, 600), 'white')
+        self.draw = ImageDraw.Draw(self.image)
+        
+        # Bind mouse events
+        self.canvas.bind('<B1-Motion>', self.paint)
+        self.canvas.bind('<ButtonRelease-1>', self.reset)
+        
+        self.old_x = None
+        self.old_y = None
+        
+    def choose_color(self):
+        color = colorchooser.askcolor(color=self.paint_color)[1]
+        if color:
+            self.paint_color = color
+            self.color_button.config(bg=color)
+    
+    def paint(self, event):
+        if self.old_x and self.old_y:
+            # Teken op canvas
+            self.canvas.create_line(self.old_x, self.old_y, event.x, event.y,
+                                   width=self.pen_size.get(), fill=self.paint_color,
+                                   capstyle=tk.ROUND, smooth=tk.TRUE)
+            # Teken op PIL image
+            self.draw.line([self.old_x, self.old_y, event.x, event.y], 
+                          fill=self.paint_color, width=self.pen_size.get())
+        
+        self.old_x = event.x
+        self.old_y = event.y
+    
+    def reset(self, event):
+        self.old_x = None
+        self.old_y = None
+    
+    def clear_canvas(self):
+        self.canvas.delete('all')
+        self.image = Image.new('RGB', (1000, 600), 'white')
+        self.draw = ImageDraw.Draw(self.image)
+    
+    def save_drawing(self):
+        filename = filedialog.asksaveasfilename(defaultextension='.png',
+                                               filetypes=[("PNG files", "*.png"),
+                                                        ("All files", "*.*")])
+        if filename:
+            self.image.save(filename)
+            messagebox.showinfo("Opgeslagen", f"Tekening opgeslagen als {filename}")
+    
+    def create_text_editor_tab(self):
+        """Tekstverwerker"""
+        editor_frame = ttk.Frame(self.notebook)
+        self.notebook.add(editor_frame, text="📝 Tekstverwerker")
+        
+        # Toolbar
+        toolbar = tk.Frame(editor_frame, bg='lightgray', height=40)
+        toolbar.pack(side='top', fill='x')
+        
+        tk.Button(toolbar, text="Nieuw", command=self.new_file).pack(side='left', padx=3, pady=3)
+        tk.Button(toolbar, text="Openen", command=self.open_file).pack(side='left', padx=3, pady=3)
+        tk.Button(toolbar, text="Opslaan", command=self.save_file).pack(side='left', padx=3, pady=3)
+        
+        # Font opties
+        tk.Label(toolbar, text="Lettertype:", bg='lightgray').pack(side='left', padx=5)
+        self.font_family = ttk.Combobox(toolbar, values=['Arial', 'Courier', 'Times', 'Helvetica'], 
+                                        width=10, state='readonly')
+        self.font_family.set('Arial')
+        self.font_family.pack(side='left', padx=3)
+        self.font_family.bind('<<ComboboxSelected>>', self.change_font)
+        
+        tk.Label(toolbar, text="Grootte:", bg='lightgray').pack(side='left', padx=5)
+        self.font_size = ttk.Combobox(toolbar, values=[8, 10, 12, 14, 16, 18, 20, 24, 28], 
+                                      width=5, state='readonly')
+        self.font_size.set('12')
+        self.font_size.pack(side='left', padx=3)
+        self.font_size.bind('<<ComboboxSelected>>', self.change_font)
+        
+        # Tekstveld met scrollbar
+        text_container = tk.Frame(editor_frame)
+        text_container.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        scrollbar = tk.Scrollbar(text_container)
+        scrollbar.pack(side='right', fill='y')
+        
+        self.text_area = tk.Text(text_container, yscrollcommand=scrollbar.set, 
+                                font=('Arial', 12), wrap='word')
+        self.text_area.pack(fill='both', expand=True)
+        scrollbar.config(command=self.text_area.yview)
+        
+    def change_font(self, event=None):
+        current_font = font.Font(family=self.font_family.get(), 
+                                size=int(self.font_size.get()))
+        self.text_area.config(font=current_font)
+    
+    def new_file(self):
+        self.text_area.delete(1.0, tk.END)
+    
+    def open_file(self):
+        filename = filedialog.askopenfilename(filetypes=[("Text files", "*.txt"),
+                                                        ("All files", "*.*")])
+        if filename:
+            with open(filename, 'r', encoding='utf-8') as file:
+                content = file.read()
+                self.text_area.delete(1.0, tk.END)
+                self.text_area.insert(1.0, content)
+    
+    def save_file(self):
+        filename = filedialog.asksaveasfilename(defaultextension='.txt',
+                                               filetypes=[("Text files", "*.txt"),
+                                                        ("All files", "*.*")])
+        if filename:
+            content = self.text_area.get(1.0, tk.END)
+            with open(filename, 'w', encoding='utf-8') as file:
+                file.write(content)
+            messagebox.showinfo("Opgeslagen", f"Bestand opgeslagen als {filename}")
+    
+    def create_calculator_tab(self):
+        """Rekenmachine"""
+        calc_frame = ttk.Frame(self.notebook)
+        self.notebook.add(calc_frame, text="🔢 Rekenmachine")
+        
+        # Centreer de calculator
+        calc_container = tk.Frame(calc_frame)
+        calc_container.place(relx=0.5, rely=0.5, anchor='center')
+        
+        # Display
+        self.calc_display = tk.Entry(calc_container, font=('Arial', 20), 
+                                     justify='right', bd=10, width=20)
+        self.calc_display.grid(row=0, column=0, columnspan=4, pady=10)
+        
+        # Calculator variabelen
+        self.calc_expression = ""
+        
+        # Knoppen layout
+        buttons = [
+            ('7', 1, 0), ('8', 1, 1), ('9', 1, 2), ('/', 1, 3),
+            ('4', 2, 0), ('5', 2, 1), ('6', 2, 2), ('*', 2, 3),
+            ('1', 3, 0), ('2', 3, 1), ('3', 3, 2), ('-', 3, 3),
+            ('0', 4, 0), ('.', 4, 1), ('=', 4, 2), ('+', 4, 3),
+            ('C', 5, 0), ('←', 5, 1), ('(', 5, 2), (')', 5, 3)
+        ]
+        
+        for (text, row, col) in buttons:
+            cmd = lambda x=text: self.calc_click(x)
+            tk.Button(calc_container, text=text, font=('Arial', 16), 
+                     width=5, height=2, command=cmd).grid(row=row, column=col, padx=2, pady=2)
+    
+    def calc_click(self, key):
+        if key == '=':
+            try:
+                result = str(eval(self.calc_expression))
+                self.calc_display.delete(0, tk.END)
+                self.calc_display.insert(0, result)
+                self.calc_expression = result
+            except:
+                self.calc_display.delete(0, tk.END)
+                self.calc_display.insert(0, "Error")
+                self.calc_expression = ""
+        elif key == 'C':
+            self.calc_expression = ""
+            self.calc_display.delete(0, tk.END)
+        elif key == '←':
+            self.calc_expression = self.calc_expression[:-1]
+            self.calc_display.delete(0, tk.END)
+            self.calc_display.insert(0, self.calc_expression)
+        else:
+            self.calc_expression += str(key)
+            self.calc_display.delete(0, tk.END)
+            self.calc_display.insert(0, self.calc_expression)
+    
+    def create_notes_tab(self):
+        """Snelle notities"""
+        notes_frame = ttk.Frame(self.notebook)
+        self.notebook.add(notes_frame, text="📋 Notities")
+        
+        # Toolbar
+        toolbar = tk.Frame(notes_frame, bg='lightgray', height=40)
+        toolbar.pack(side='top', fill='x')
+        
+        tk.Button(toolbar, text="Nieuwe notitie", 
+                 command=self.add_note).pack(side='left', padx=5, pady=5)
+        tk.Button(toolbar, text="Verwijder geselecteerde", 
+                 command=self.delete_note).pack(side='left', padx=5, pady=5)
+        
+        # Frame voor notities lijst
+        list_frame = tk.Frame(notes_frame)
+        list_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # Listbox met scrollbar
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side='right', fill='y')
+        
+        self.notes_list = tk.Listbox(list_frame, font=('Arial', 11), 
+                                     yscrollcommand=scrollbar.set)
+        self.notes_list.pack(fill='both', expand=True)
+        scrollbar.config(command=self.notes_list.yview)
+        
+        # Voorbeeldnotities
+        sample_notes = [
+            "Welkom bij de notities app!",
+            "Klik op 'Nieuwe notitie' om een notitie toe te voegen",
+            "Selecteer een notitie en klik 'Verwijder geselecteerde' om te verwijderen"
+        ]
+        for note in sample_notes:
+            self.notes_list.insert(tk.END, note)
+    
+    def add_note(self):
+        note = tk.simpledialog.askstring("Nieuwe notitie", "Voer je notitie in:")
+        if note:
+            self.notes_list.insert(tk.END, note)
+    
+    def delete_note(self):
+        try:
+            selected = self.notes_list.curselection()
+            if selected:
+                self.notes_list.delete(selected)
+        except:
+            messagebox.showwarning("Geen selectie", "Selecteer eerst een notitie")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = AllesInEenSoftware(root)
+    root.mainloop()
